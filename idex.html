@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Sasha, be my Valentine?</title>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+  <style>
+    :root{
+      --bgA:#fff0f7;
+      --bgB:#ffc2dc;
+      --card: rgba(255,255,255,.72);
+      --stroke: rgba(255, 60, 130, .18);
+      --text:#1f1a1d;
+      --pink:#ff2e7a;
+      --pink2:#ff6fa5;
+      --pink3:#ffd1e2;
+      --muted: rgba(31,26,29,.66);
+      --shadow: 0 24px 70px rgba(16, 24, 40, .18);
+      --radius: 22px;
+    }
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      min-height:100svh;
+      display:grid;
+      place-items:center;
+      background: radial-gradient(900px 600px at 20% 10%, var(--bgA), transparent),
+                  radial-gradient(900px 600px at 80% 15%, #ffe3ef, transparent),
+                  radial-gradient(1000px 800px at 50% 100%, var(--bgB), #fff);
+      color:var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      overflow:hidden;
+      padding:16px;
+    }
+    /* Confetti canvas */
+    #confettiCanvas{
+      position:fixed;
+      inset:0;
+      width:100vw;
+      height:100vh;
+      pointer-events:none;
+      z-index:9999;
+    }
+    /* Ambient floating dots/hearts */
+    .ambient{
+      position:fixed; inset:0;
+      pointer-events:none;
+      z-index:0;
+      overflow:hidden;
+      opacity:.65;
+      filter: blur(.1px);
+    }
+    .float{
+      position:absolute;
+      bottom:-60px;
+      font-size:18px;
+      animation: floatUp linear infinite;
+      text-shadow: 0 18px 30px rgba(0,0,0,.08);
+      will-change: transform, opacity;
+    }
+    @keyframes floatUp{
+      from{ transform: translateY(0) translateX(0) scale(.9); opacity:0; }
+      12%{ opacity:.85; }
+      to{ transform: translateY(-120vh) translateX(var(--drift, 0px)) scale(1.2); opacity:0; }
+    }
+    .wrap{
+      width:min(860px, 94vw);
+      position:relative;
+      z-index:1;
+    }
+    .card{
+      border-radius: var(--radius);
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,.55);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+      overflow:hidden;
+    }
+    .top{
+      padding: 22px 22px 14px;
+      display:flex;
+      gap:16px;
+      align-items:center;
+      justify-content:space-between;
+      border-bottom: 1px solid rgba(255,255,255,.55);
+    }
+    .badge{
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      padding:10px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.62);
+      border: 1px solid rgba(255,46,122,.14);
+      box-shadow: 0 12px 30px rgba(255,46,122,.10);
+      font-weight: 700;
+      letter-spacing: .2px;
+      color: rgba(31,26,29,.88);
+      user-select:none;
+    }
+    .dot{
+      width:10px; height:10px;
+      border-radius:999px;
+      background: linear-gradient(135deg, var(--pink), var(--pink2));
+      box-shadow: 0 0 0 6px rgba(255,46,122,.12);
+    }
+    .title{
+      padding: 18px 22px 10px;
+      text-align:left;
+    }
+    h1{
+      margin:0;
+      font-size: clamp(28px, 3.8vw, 48px);
+      letter-spacing: -0.02em;
+      line-height: 1.05;
+    }
+    .subtitle{
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+      max-width: 62ch;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 18px;
+      padding: 16px 22px 22px;
+    }
+    @media (max-width: 860px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+    /* Florida -> London mini-map */
+    .map{
+      border-radius: 18px;
+      padding: 16px;
+      background: rgba(255,255,255,.55);
+      border: 1px solid rgba(255,46,122,.12);
+      position:relative;
+      overflow:hidden;
+      min-height: 220px;
+    }
+    .map .labels{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      font-weight: 750;
+      color: rgba(31,26,29,.88);
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 10px 12px;
+      border-radius:999px;
+      background: rgba(255,255,255,.62);
+      border:1px solid rgba(255,46,122,.12);
+      user-select:none;
+      white-space:nowrap;
+    }
+    .flag{ font-size: 16px; }
+    .small{
+      display:block;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .path{
+      position:absolute;
+      inset:0;
+      display:grid;
+      place-items:center;
+      pointer-events:none;
+    }
+    svg{ display:block; width:100%; height:220px; }
+    .line{
+      stroke: rgba(255,46,122,.35);
+      stroke-width: 3;
+      fill:none;
+      stroke-linecap: round;
+      stroke-dasharray: 7 10;
+      animation: dash 2.6s linear infinite;
+    }
+    @keyframes dash{
+      to{ stroke-dashoffset: -34; }
+    }
+    .plane{
+      filter: drop-shadow(0 10px 16px rgba(0,0,0,.12));
+      transform-origin: center;
+      animation: floatPlane 2.8s ease-in-out infinite;
+    }
+    @keyframes floatPlane{
+      0%,100%{ transform: translateY(0); }
+      50%{ transform: translateY(-6px); }
+    }
+    .pin{
+      fill: url(#pinGrad);
+      filter: drop-shadow(0 14px 18px rgba(255,46,122,.16));
+    }
+    /* Right side: interaction */
+    .panel{
+      border-radius: 18px;
+      padding: 16px;
+      background: rgba(255,255,255,.55);
+      border: 1px solid rgba(255,46,122,.12);
+      min-height: 220px;
+      display:flex;
+      flex-direction:column;
+      justify-content:space-between;
+      gap: 14px;
+    }
+    .prompt{
+      font-weight: 850;
+      font-size: 18px;
+      letter-spacing: -.01em;
+    }
+    .note{
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+      margin-top: 6px;
+    }
+    .btnRow{
+      position:relative;
+      height: 86px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.55);
+      border: 1px dashed rgba(255,46,122,.18);
+      overflow:hidden;
+      touch-action:none;
+    }
+    button{
+      position:absolute;
+      top:50%;
+      transform: translate(-50%, -50%) scale(var(--s, 1));
+      padding: 14px 20px;
+      border-radius:999px;
+      border:none;
+      font-size: 16px;
+      font-weight: 900;
+      cursor:pointer;
+      box-shadow: 0 14px 30px rgba(0,0,0,.14);
+      transition: transform .15s ease, background .12s ease;
+      -webkit-tap-highlight-color: transparent;
+      user-select:none;
+      letter-spacing: .2px;
+    }
+    #yes{
+      left: 28%;
+      background: linear-gradient(135deg, var(--pink), var(--pink2));
+      color: #fff;
+    }
+    #yes:hover{ filter: brightness(.98); }
+    #no{
+      left: 72%;
+      background: rgba(255,255,255,.75);
+      color: rgba(31,26,29,.82);
+      border: 1px solid rgba(255,46,122,.12);
+      box-shadow: 0 14px 30px rgba(255,46,122,.10);
+    }
+    .hint{
+      min-height: 18px;
+      font-size: 12.5px;
+      color: rgba(31,26,29,.64);
+    }
+    /* Reveal section (after Yes) */
+    .reveal{
+      display:none;
+      border-top: 1px solid rgba(255,255,255,.55);
+      padding: 18px 22px 22px;
+    }
+    .revealTop{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+    .reveal h2{
+      margin:0;
+      font-size: clamp(24px, 3vw, 34px);
+      letter-spacing: -0.02em;
+    }
+    .reveal p{
+      margin:8px 0 0;
+      color: var(--muted);
+      line-height:1.5;
+      max-width: 70ch;
+    }
+    /* Photo strip */
+    .strip{
+      margin-top: 14px;
+      display:flex;
+      gap: 10px;
+      overflow:auto;
+      padding-bottom: 6px;
+      scroll-snap-type: x mandatory;
+    }
+    .shot{
+      scroll-snap-align: start;
+      min-width: 220px;
+      max-width: 260px;
+      border-radius: 16px;
+      overflow:hidden;
+      border: 1px solid rgba(255,46,122,.12);
+      background: rgba(255,255,255,.55);
+      box-shadow: 0 18px 36px rgba(0,0,0,.10);
+    }
+    .shot img{
+      width:100%;
+      height: 170px;
+      object-fit: cover;
+      display:block;
+    }
+    .cap{
+      padding: 10px 12px;
+      font-size: 13px;
+      color: rgba(31,26,29,.78);
+    }
+    /* Tiny footer */
+    .footer{
+      padding: 12px 22px 18px;
+      color: rgba(31,26,29,.55);
+      font-size: 12px;
+    }
+    @keyframes pop {
+      from { transform: translateY(6px); opacity:0; }
+      to { transform: translateY(0); opacity:1; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="confettiCanvas"></canvas>
+  <div class="ambient" id="ambient"></div>
+  <div class="wrap">
+    <div class="card">
+      <div class="top">
+        <div class="badge"><span class="dot"></span> Sushi ⇄ Florida → London</div>
+        <div class="badge" aria-hidden="true">💗</div>
+      </div>
+      <div class="title">
+        <h1>Sasha… will you be my Valentine?</h1>
+        <p class="subtitle">
+          I know you’re shy, so I’ll keep it simple.
+          Just us — Florida and London — same team.
+        </p>
+      </div>
+      <div class="grid">
+        <!-- Map -->
+        <div class="map">
+          <div class="labels">
+            <span class="pill"><span class="flag">🌴</span>Florida <span style="opacity:.65;font-weight:700;">(me)</span></span>
+            <span class="pill"><span class="flag">🎡</span>London <span style="opacity:.65;font-weight:700;">(you)</span></span>
+          </div>
+          <div class="path" aria-hidden="true">
+            <svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="pinGrad" x1="0" x2="1">
+                  <stop offset="0" stop-color="#ff2e7a"/>
+                  <stop offset="1" stop-color="#ff6fa5"/>
+                </linearGradient>
+              </defs>
+              <!-- pins -->
+              <path class="pin" d="M170 135c0-30 24-54 54-54s54 24 54 54c0 43-54 96-54 96s-54-53-54-96z"/>
+              <circle cx="224" cy="135" r="18" fill="rgba(255,255,255,.85)"/>
+              <circle cx="224" cy="135" r="8" fill="rgba(255,46,122,.8)"/>
+              <path class="pin" d="M440 98c0-30 24-54 54-54s54 24 54 54c0 43-54 96-54 96s-54-53-54-96z"/>
+              <circle cx="494" cy="98" r="18" fill="rgba(255,255,255,.85)"/>
+              <circle cx="494" cy="98" r="8" fill="rgba(255,46,122,.8)"/>
+              <!-- dotted path -->
+              <path class="line" d="M270 122 C 330 40, 395 40, 460 85" />
+              <!-- plane -->
+              <g class="plane">
+                <path d="M360 72 l22 10 -18 6 3 9 -6 2 -6-8 -10 3 -2-5 10-5 -4-10 6-2 5 9z"
+                      fill="rgba(255,46,122,.85)"/>
+                <circle cx="360" cy="72" r="3" fill="rgba(255,255,255,.9)"/>
+              </g>
+            </svg>
+          </div>
+          <span class="small">Distance is real. So is this.</span>
+        </div>
+        <!-- Interaction panel -->
+        <div class="panel">
+          <div>
+            <div class="prompt">Hey Sushi… be my Valentine?</div>
+            <div class="note">
+              (Low pressure. You can be shy — I’ll be brave for both of us.)
+            </div>
+          </div>
+          <div>
+            <div class="btnRow" id="zone">
+              <button id="yes">Yes 💗</button>
+              <button id="no">No</button>
+            </div>
+            <div class="hint" id="hint">“No” is kind of scared of you.</div>
+          </div>
+        </div>
+      </div>
+      <!-- Reveal -->
+      <div class="reveal" id="reveal">
+        <div class="revealTop">
+          <div>
+            <h2>Okay… that just made my day 🥹</h2>
+            <p>
+              Sushi, I’ll take you on a proper Valentine — even if it starts on FaceTime.
+              Florida → London, soon.<br><br>
+              You're my favorite person in any timezone.
+            </p>
+          </div>
+          <div class="badge">✅ Valentine secured</div>
+        </div>
+        <!-- PHOTOS: replace src with your own pics when ready -->
+        <div class="strip" id="strip">
+          <div class="shot">
+            <img src="https://images.unsplash.com/photo-1519741497674-281450d6a204?auto=format&fit=crop&w=900&q=70" alt="Couple holding hands">
+            <div class="cap">This is us — no matter the miles</div>
+          </div>
+          <div class="shot">
+            <img src="https://images.unsplash.com/photo-1511632765486-a01980e01a18?auto=format&fit=crop&w=900&q=70" alt="Heart hands">
+            <div class="cap">My heart is already with you</div>
+          </div>
+          <div class="shot">
+            <img src="https://images.unsplash.com/photo-1600486913747-2b0a9a5b3c9e?auto=format&fit=crop&w=900&q=70" alt="Couple silhouette">
+            <div class="cap">Can't wait to close this gap</div>
+          </div>
+          <div class="shot">
+            <img src="https://images.unsplash.com/photo-1519125323398-675f398f6978?auto=format&fit=crop&w=900&q=70" alt="Romantic moment">
+            <div class="cap">You're worth every second of waiting</div>
+          </div>
+        </div>
+      </div>
+      <div class="footer">
+        made with 🩷 (and a little long-distance determination)
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Ambient floaties
+    const ambient = document.getElementById("ambient");
+    function spawnFloat(){
+      const el = document.createElement("div");
+      el.className = "float";
+      el.textContent = Math.random() < 0.6 ? "💗" : (Math.random() < 0.5 ? "✨" : "💖");
+      el.style.left = (Math.random()*100) + "vw";
+      el.style.fontSize = (14 + Math.random()*18) + "px";
+      el.style.opacity = (0.35 + Math.random()*0.55).toFixed(2);
+      el.style.setProperty("--drift", ((Math.random()*2-1)*80).toFixed(0) + "px");
+      el.style.animationDuration = (6 + Math.random()*7).toFixed(2) + "s";
+      ambient.appendChild(el);
+      setTimeout(()=> el.remove(), 14000);
+    }
+    setInterval(spawnFloat, 520);
+
+    // Confetti setup
+    const confettiCanvas = document.getElementById("confettiCanvas");
+    function resizeConfettiCanvas(){
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      confettiCanvas.width = Math.floor(window.innerWidth * dpr);
+      confettiCanvas.height = Math.floor(window.innerHeight * dpr);
+      confettiCanvas.style.width = "100vw";
+      confettiCanvas.style.height = "100vh";
+      const ctx = confettiCanvas.getContext("2d");
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+    }
+    resizeConfettiCanvas();
+    window.addEventListener("resize", resizeConfettiCanvas);
+    window.addEventListener("orientationchange", () => setTimeout(resizeConfettiCanvas, 150));
+    const confettiInstance = confetti.create(confettiCanvas, { resize:false, useWorker:true });
+
+    function burstAt(x,y){
+      confettiInstance({
+        particleCount: 22,
+        spread: 60,
+        startVelocity: 18,
+        ticks: 140,
+        origin: { x, y },
+        colors: ["#ff2e7a","#ff6fa5","#ffd1e2","#ffffff"]
+      });
+    }
+
+    function fullConfetti(){
+      const end = Date.now() + 1400;
+      (function frame(){
+        confettiInstance({
+          particleCount: 12,
+          spread: 90,
+          startVelocity: 42,
+          ticks: 170,
+          origin: { x: Math.random(), y: Math.random()*0.32 },
+          colors: ["#ff2e7a","#ff6fa5","#ffd1e2","#ffffff"]
+        });
+        if(Date.now() < end) requestAnimationFrame(frame);
+      })();
+      setTimeout(()=>{
+        confettiInstance({
+          particleCount: 260,
+          spread: 140,
+          startVelocity: 58,
+          ticks: 240,
+          origin: { x:0.5, y:0.55 },
+          colors: ["#ff2e7a","#ff6fa5","#ffd1e2","#ffffff"]
+        });
+      }, 260);
+    }
+
+    // Buttons logic
+    const zone = document.getElementById("zone");
+    const yes = document.getElementById("yes");
+    const no = document.getElementById("no");
+    const hint = document.getElementById("hint");
+    const reveal = document.getElementById("reveal");
+
+    let yesScale = 1;
+    let noIdx = 0;
+
+    const noLines = [
+      "No",
+      "Sushi… you sure?",
+      "Be serious 😏",
+      "Okay you’re shy, I get it",
+      "That button is panicking",
+      "Just click Yes 💗",
+      "Please? 🥺",
+      "I'm begging now"
+    ];
+
+    function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+
+    function growYes() {
+      yesScale = Math.min(2.4, yesScale + 0.14);
+      yes.style.setProperty("--s", yesScale.toFixed(2));
+      const shrink = Math.max(0.55, 1 - (yesScale - 1) * 0.52);
+      no.style.setProperty("--s", shrink.toFixed(2));
+    }
+
+    function dodge(px, py) {
+      const z = zone.getBoundingClientRect();
+      const b = no.getBoundingClientRect();
+
+      let dx = (b.left + b.width / 2) - px;
+      let dy = (b.top + b.height / 2) - py;
+      const mag = Math.hypot(dx, dy) || 1;
+      dx /= mag; dy /= mag;
+
+      const curX = (b.left - z.left) + b.width / 2;
+      const curY = (b.top - z.top) + b.height / 2;
+
+      const step = 120 + Math.random() * 90;
+      let nx = curX + dx * step;
+      let ny = curY + dy * step;
+
+      nx = clamp(nx, b.width / 2 + 10, z.width - b.width / 2 - 10);
+      ny = clamp(ny, b.height / 2 + 10, z.height - b.height / 2 - 10);
+
+      no.style.left = nx + "px";
+      no.style.top  = ny + "px";
+
+      noIdx = Math.min(noIdx + 1, noLines.length - 1);
+      no.textContent = noLines[noIdx];
+
+      hint.textContent = noIdx >= 5
+        ? "Sasha… it’s okay. Click Yes when you're ready 💕"
+        : "“No” is kind of scared of you.";
+
+      const ox = (b.left + b.width / 2) / window.innerWidth;
+      const oy = (b.top + b.height / 2) / window.innerHeight;
+      burstAt(ox, oy);
+
+      growYes();
+    }
+
+    function maybeDodge(e) {
+      const b = no.getBoundingClientRect();
+      const dist = Math.hypot(
+        (b.left + b.width / 2) - e.clientX,
+        (b.top + b.height / 2) - e.clientY
+      );
+      if (dist < 160) {
+        dodge(e.clientX, e.clientY);
+      }
+    }
+
+    // Events
+    yes.addEventListener("click", () => {
+      fullConfetti();
+      reveal.style.display = "block";
+      reveal.style.animation = "pop 0.6s ease-out";
+      zone.style.pointerEvents = "none";
+      no.style.opacity = "0.3";
+      hint.textContent = "Best decision ever 🥰";
+      yes.textContent = "You're mine now 💗";
+      yes.style.left = "50%";
+      yes.style.transform = "translate(-50%, -50%) scale(1.3)";
+    });
+
+    no.addEventListener("click", () => {
+      if (noIdx < noLines.length - 1) {
+        dodge(
+          no.getBoundingClientRect().left + no.getBoundingClientRect().width / 2,
+          no.getBoundingClientRect().top + no.getBoundingClientRect().height / 2
+        );
+      } else {
+        hint.textContent = "Okay okay… you win this round 😅 But I still love you";
+      }
+    });
+
+    zone.addEventListener("mousemove", maybeDodge);
+    zone.addEventListener("touchmove", (e) => {
+      if (e.touches.length) maybeDodge(e.touches[0]);
+    }, { passive: true });
+
+    // Initial tiny burst because why not
+    setTimeout(() => burstAt(0.5, 0.5), 800);
+  </script>
+</body>
+</html>
